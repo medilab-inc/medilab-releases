@@ -98,11 +98,23 @@ jobs:
                               if detail_line.strip().startswith('- '):
                                   text = detail_line.strip()[2:].strip()[:1900]
                                   if text:
+                                      # Process bold text in toggle content
+                                      rich_text = []
+                                      parts = re.split(r'(\\*\\*[^*]+\\*\\*)', text)
+                                      for part in parts:
+                                          if part.startswith('**') and part.endswith('**'):
+                                              rich_text.append({
+                                                  'text': {'content': part[2:-2]},
+                                                  'annotations': {'bold': True}
+                                              })
+                                          elif part:
+                                              rich_text.append({'text': {'content': part}})
+                                      
                                       toggle_children.append({
                                           'object': 'block',
                                           'type': 'bulleted_list_item',
                                           'bulleted_list_item': {
-                                              'rich_text': [{'text': {'content': text}}]
+                                              'rich_text': rich_text[:10] if rich_text else [{'text': {'content': text}}]
                                           }
                                       })
                           
@@ -153,22 +165,46 @@ jobs:
                   elif line.strip().startswith('- '):
                       text = line.strip()[2:].strip()[:1900]
                       if text:
+                          # Process bold text in list items
+                          rich_text = []
+                          parts = re.split(r'(\\*\\*[^*]+\\*\\*)', text)
+                          for part in parts:
+                              if part.startswith('**') and part.endswith('**'):
+                                  rich_text.append({
+                                      'text': {'content': part[2:-2]},
+                                      'annotations': {'bold': True}
+                                  })
+                              elif part:
+                                  rich_text.append({'text': {'content': part}})
+                          
                           blocks.append({
                               'object': 'block',
                               'type': 'bulleted_list_item',
                               'bulleted_list_item': {
-                                  'rich_text': [{'text': {'content': text}}]
+                                  'rich_text': rich_text[:10] if rich_text else [{'text': {'content': text}}]
                               }
                           })
                   # Numbered lists
                   elif re.match(r'^\\d+\\.\\s', line.strip()):
                       text = re.sub(r'^\\d+\\.\\s', '', line.strip())[:1900]
                       if text:
+                          # Process bold text in list items
+                          rich_text = []
+                          parts = re.split(r'(\\*\\*[^*]+\\*\\*)', text)
+                          for part in parts:
+                              if part.startswith('**') and part.endswith('**'):
+                                  rich_text.append({
+                                      'text': {'content': part[2:-2]},
+                                      'annotations': {'bold': True}
+                                  })
+                              elif part:
+                                  rich_text.append({'text': {'content': part}})
+                          
                           blocks.append({
                               'object': 'block',
                               'type': 'numbered_list_item',
                               'numbered_list_item': {
-                                  'rich_text': [{'text': {'content': text}}]
+                                  'rich_text': rich_text[:10] if rich_text else [{'text': {'content': text}}]
                               }
                           })
                   # Bold text in paragraph
