@@ -71,7 +71,7 @@ jobs:
               lines = md_text.split('\\n')
               i = 0
               
-              while i < len(lines) and len(blocks) < 50:  # Limit blocks
+              while i < len(lines) and len(blocks) < 100:  # Notion API limit is 100 blocks
                   line = lines[i]
                   
                   # Headers
@@ -142,6 +142,7 @@ jobs:
                               'type': 'paragraph',
                               'paragraph': {'rich_text': rich_text[:10]}  # Limit rich text items
                           })
+                  # Skip empty lines but don't create blocks for them
                   
                   i += 1
               
@@ -160,6 +161,7 @@ jobs:
               try:
                   # Convert markdown to Notion blocks
                   blocks = markdown_to_notion_blocks(content)
+                  total_lines = len(content.split('\\n'))
                   
                   # Create a new page in Notion
                   response = notion.pages.create(
@@ -177,7 +179,7 @@ jobs:
                   )
                   print(f'✅ Created page: {title}')
                   print(f'   Page ID: {response[\"id\"]}')
-                  print(f'   Blocks created: {len(blocks)}')
+                  print(f'   Blocks created: {len(blocks)} / Total lines in MD: {total_lines}')
               except Exception as e:
                   print(f'❌ Failed to create page {title}: {e}')
           "
