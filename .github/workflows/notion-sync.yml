@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'products/**/*.md'
+      - '.github/workflows/notion-sync.yml'
   workflow_dispatch:
 
 jobs:
