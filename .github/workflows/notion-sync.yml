@@ -75,7 +75,7 @@ jobs:
               title = Path(md_file).stem.replace('_', ' ')
               
               # Split content into chunks (Notion API limit)
-              max_length = 2000
+              max_length = 1900  # 安全のため少し小さく
               content_chunks = [content[i:i+max_length] for i in range(0, len(content), max_length)]
               
               try:
