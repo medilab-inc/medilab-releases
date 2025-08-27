@@ -18,36 +18,80 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
           
-      - name: Install notion-sync
-        run: npm install -g @startnext/notion-sync
+      - name: Install notion-client
+        run: pip install notion-client
         
       - name: Sync Release Notes to Notion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_ROOT_PAGE_ID: ${{ secrets.NOTION_ROOT_PAGE_ID }}
         run: |
-          # products配下のリリースノートを同期
-          notion-sync sync \
-            --token "$NOTION_TOKEN" \
-            --root-page "$NOTION_ROOT_PAGE_ID" \
-            --source-dir ./products \
-            --recursive \
-            --create-root-folder "製品リリースノート"
-            
-          # docs配下のドキュメントを同期（存在する場合）
-          if [ -d "./docs" ] && [ "$(ls -A ./docs)" ]; then
-            notion-sync sync \
-              --token "$NOTION_TOKEN" \
-              --root-page "$NOTION_ROOT_PAGE_ID" \
-              --source-dir ./docs \
-              --recursive \
-              --create-root-folder "ドキュメント"
-          fi
+          # Pythonスクリプトで同期処理を実行
+          python -c "
+import os
+import glob
+from pathlib import Path
+from notion_client import Client
+
+# Notion client setup
+notion = Client(auth=os.environ['NOTION_TOKEN'])
+root_page_id = os.environ['NOTION_ROOT_PAGE_ID']
+
+# Find all markdown files
+md_files = glob.glob('products/**/*.md', recursive=True)
+
+print(f'Found {len(md_files)} markdown files to sync')
+for file in md_files:
+    print(f'  - {file}')
+
+# Simple upload for now - just create child pages
+for md_file in md_files:
+    with open(md_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Create page title from filename
+    title = Path(md_file).stem.replace('_', ' ')
+    
+    try:
+        # Create a new page in Notion
+        response = notion.pages.create(
+            parent={'page_id': root_page_id},
+            properties={
+                'title': {
+                    'title': [
+                        {
+                            'text': {
+                                'content': title
+                            }
+                        }
+                    ]
+                }
+            },
+            children=[
+                {
+                    'object': 'block',
+                    'type': 'paragraph',
+                    'paragraph': {
+                        'rich_text': [
+                            {
+                                'text': {
+                                    'content': content[:2000]  # Notionの制限のため最初の2000文字のみ
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        )
+        print(f'✅ Created page: {title}')
+    except Exception as e:
+        print(f'❌ Failed to create page {title}: {e}')
+"
           
       - name: Notify Slack on Success
         if: success()
