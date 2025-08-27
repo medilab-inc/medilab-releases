@@ -1,0 +1,66 @@
+name: Sync to Notion
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'products/**/*.md'
+      - 'docs/**/*.md'
+      - 'templates/**/*.md'
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install notion-sync
+        run: npm install -g @startnext/notion-sync
+        
+      - name: Sync Release Notes to Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_ROOT_PAGE_ID: ${{ secrets.NOTION_ROOT_PAGE_ID }}
+        run: |
+          # products配下のリリースノートを同期
+          notion-sync sync \
+            --token "$NOTION_TOKEN" \
+            --root-page "$NOTION_ROOT_PAGE_ID" \
+            --source-dir ./products \
+            --recursive \
+            --create-root-folder "製品リリースノート"
+            
+          # docs配下のドキュメントを同期（存在する場合）
+          if [ -d "./docs" ] && [ "$(ls -A ./docs)" ]; then
+            notion-sync sync \
+              --token "$NOTION_TOKEN" \
+              --root-page "$NOTION_ROOT_PAGE_ID" \
+              --source-dir ./docs \
+              --recursive \
+              --create-root-folder "ドキュメント"
+          fi
+          
+      - name: Notify Slack on Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: '✅ Notionへの同期が完了しました'
+          SLACK_CHANNEL: '#release-notes'
+          
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: '❌ Notion同期に失敗しました。ログを確認してください。'
+          SLACK_CHANNEL: '#release-notes'
