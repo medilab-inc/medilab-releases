@@ -159,11 +159,15 @@ jobs:
               title = Path(md_file).stem.replace('_', ' ')
               
               try:
-                  # Convert markdown to Notion blocks
-                  blocks = markdown_to_notion_blocks(content)
-                  total_lines = len(content.split('\\n'))
+                  # Get all lines
+                  all_lines = content.split('\\n')
+                  total_lines = len(all_lines)
                   
-                  # Create a new page in Notion
+                  # Create initial blocks (first 100 lines)
+                  first_chunk = '\\n'.join(all_lines[:100])
+                  blocks = markdown_to_notion_blocks(first_chunk)
+                  
+                  # Create a new page in Notion with first chunk
                   response = notion.pages.create(
                       parent={'page_id': root_page_id},
                       properties={
@@ -177,9 +181,31 @@ jobs:
                       },
                       children=blocks[:100] if blocks else None  # Notion API limit
                   )
+                  page_id = response['id']
                   print(f'✅ Created page: {title}')
-                  print(f'   Page ID: {response[\"id\"]}')
-                  print(f'   Blocks created: {len(blocks)} / Total lines in MD: {total_lines}')
+                  print(f'   Page ID: {page_id}')
+                  
+                  # Add remaining content in batches
+                  remaining_lines = all_lines[100:]
+                  batch_num = 1
+                  
+                  while remaining_lines and batch_num < 3:  # Limit to 3 batches total
+                      chunk = '\\n'.join(remaining_lines[:100])
+                      additional_blocks = markdown_to_notion_blocks(chunk)
+                      
+                      if additional_blocks:
+                          try:
+                              # Append blocks to the page
+                              for block in additional_blocks[:50]:  # Add 50 blocks at a time
+                                  notion.blocks.children.append(page_id, children=[block])
+                              print(f'   Added batch {batch_num+1}: {len(additional_blocks[:50])} blocks')
+                          except Exception as e:
+                              print(f'   Warning: Could not add batch {batch_num+1}: {e}')
+                      
+                      remaining_lines = remaining_lines[100:]
+                      batch_num += 1
+                  
+                  print(f'   Total content: {total_lines} lines processed')
               except Exception as e:
                   print(f'❌ Failed to create page {title}: {e}')
           "
