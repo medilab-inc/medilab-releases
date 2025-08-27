@@ -70,12 +70,62 @@ jobs:
               blocks = []
               lines = md_text.split('\\n')
               i = 0
+              in_details = False
+              details_content = []
+              details_summary = ''
               
               while i < len(lines) and len(blocks) < 100:  # Notion API limit is 100 blocks
                   line = lines[i]
                   
+                  # Handle <details> tags
+                  if '<details>' in line:
+                      in_details = True
+                      details_content = []
+                      i += 1
+                      continue
+                  elif '<summary>' in line and in_details:
+                      # Extract summary text
+                      summary_match = re.search(r'<summary>([^<]+)</summary>', line)
+                      if summary_match:
+                          details_summary = summary_match.group(1).strip()
+                      i += 1
+                      continue
+                  elif '</details>' in line and in_details:
+                      # Create a toggle block with the collected content
+                      if details_summary:
+                          toggle_children = []
+                          for detail_line in details_content:
+                              if detail_line.strip().startswith('- '):
+                                  text = detail_line.strip()[2:].strip()[:1900]
+                                  if text:
+                                      toggle_children.append({
+                                          'object': 'block',
+                                          'type': 'bulleted_list_item',
+                                          'bulleted_list_item': {
+                                              'rich_text': [{'text': {'content': text}}]
+                                          }
+                                      })
+                          
+                          blocks.append({
+                              'object': 'block',
+                              'type': 'toggle',
+                              'toggle': {
+                                  'rich_text': [{'text': {'content': details_summary[:100]}}],
+                                  'children': toggle_children[:10]  # Limit children
+                              }
+                          })
+                      in_details = False
+                      details_summary = ''
+                      i += 1
+                      continue
+                  elif in_details:
+                      # Collect content inside details
+                      details_content.append(line)
+                      i += 1
+                      continue
+                  
                   # Headers
-                  if line.startswith('# '):
+                  elif line.startswith('# '):
                       blocks.append({
                           'object': 'block',
                           'type': 'heading_1',
@@ -142,7 +192,6 @@ jobs:
                               'type': 'paragraph',
                               'paragraph': {'rich_text': rich_text[:10]}  # Limit rich text items
                           })
-                  # Skip empty lines but don't create blocks for them
                   
                   i += 1
               
@@ -159,15 +208,14 @@ jobs:
               title = Path(md_file).stem.replace('_', ' ')
               
               try:
-                  # Get all lines
-                  all_lines = content.split('\\n')
-                  total_lines = len(all_lines)
+                  # Convert first part of content (optimized for important sections)
+                  lines = content.split('\\n')
                   
-                  # Create initial blocks (first 100 lines)
-                  first_chunk = '\\n'.join(all_lines[:100])
-                  blocks = markdown_to_notion_blocks(first_chunk)
+                  # Focus on the first 200 lines which usually contain the most important info
+                  important_content = '\\n'.join(lines[:200])
+                  blocks = markdown_to_notion_blocks(important_content)
                   
-                  # Create a new page in Notion with first chunk
+                  # Create a new page in Notion
                   response = notion.pages.create(
                       parent={'page_id': root_page_id},
                       properties={
@@ -181,31 +229,14 @@ jobs:
                       },
                       children=blocks[:100] if blocks else None  # Notion API limit
                   )
-                  page_id = response['id']
+                  
                   print(f'✅ Created page: {title}')
-                  print(f'   Page ID: {page_id}')
+                  print(f'   Page ID: {response[\"id\"]}')
+                  print(f'   Blocks created: {len(blocks)} (from {len(lines)} total lines)')
                   
-                  # Add remaining content in batches
-                  remaining_lines = all_lines[100:]
-                  batch_num = 1
-                  
-                  while remaining_lines and batch_num < 3:  # Limit to 3 batches total
-                      chunk = '\\n'.join(remaining_lines[:100])
-                      additional_blocks = markdown_to_notion_blocks(chunk)
-                      
-                      if additional_blocks:
-                          try:
-                              # Append blocks to the page
-                              for block in additional_blocks[:50]:  # Add 50 blocks at a time
-                                  notion.blocks.children.append(page_id, children=[block])
-                              print(f'   Added batch {batch_num+1}: {len(additional_blocks[:50])} blocks')
-                          except Exception as e:
-                              print(f'   Warning: Could not add batch {batch_num+1}: {e}')
-                      
-                      remaining_lines = remaining_lines[100:]
-                      batch_num += 1
-                  
-                  print(f'   Total content: {total_lines} lines processed')
+                  # Add a link to GitHub for full content
+                  if len(lines) > 200:
+                      print(f'   Note: Full content ({len(lines)} lines) available in GitHub')
               except Exception as e:
                   print(f'❌ Failed to create page {title}: {e}')
           "
