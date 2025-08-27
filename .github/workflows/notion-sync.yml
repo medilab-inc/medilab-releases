@@ -22,7 +22,7 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: pip install notion-client
+        run: pip install notion-client markdown2
       
       - name: Test Notion Connection
         env:
@@ -57,12 +57,95 @@ jobs:
         run: |
           python -c "
           import os
+          import re
           import glob
           from pathlib import Path
           from notion_client import Client
           
           notion = Client(auth=os.environ['NOTION_TOKEN'])
           root_page_id = os.environ['NOTION_ROOT_PAGE_ID']
+          
+          def markdown_to_notion_blocks(md_text):
+              '''Convert markdown text to Notion blocks'''
+              blocks = []
+              lines = md_text.split('\\n')
+              i = 0
+              
+              while i < len(lines) and len(blocks) < 50:  # Limit blocks
+                  line = lines[i]
+                  
+                  # Headers
+                  if line.startswith('# '):
+                      blocks.append({
+                          'object': 'block',
+                          'type': 'heading_1',
+                          'heading_1': {
+                              'rich_text': [{'text': {'content': line[2:].strip()[:100]}}]
+                          }
+                      })
+                  elif line.startswith('## '):
+                      blocks.append({
+                          'object': 'block',
+                          'type': 'heading_2',
+                          'heading_2': {
+                              'rich_text': [{'text': {'content': line[3:].strip()[:100]}}]
+                          }
+                      })
+                  elif line.startswith('### '):
+                      blocks.append({
+                          'object': 'block',
+                          'type': 'heading_3',
+                          'heading_3': {
+                              'rich_text': [{'text': {'content': line[4:].strip()[:100]}}]
+                          }
+                      })
+                  # Bullet lists
+                  elif line.strip().startswith('- '):
+                      text = line.strip()[2:].strip()[:1900]
+                      if text:
+                          blocks.append({
+                              'object': 'block',
+                              'type': 'bulleted_list_item',
+                              'bulleted_list_item': {
+                                  'rich_text': [{'text': {'content': text}}]
+                              }
+                          })
+                  # Numbered lists
+                  elif re.match(r'^\\d+\\.\\s', line.strip()):
+                      text = re.sub(r'^\\d+\\.\\s', '', line.strip())[:1900]
+                      if text:
+                          blocks.append({
+                              'object': 'block',
+                              'type': 'numbered_list_item',
+                              'numbered_list_item': {
+                                  'rich_text': [{'text': {'content': text}}]
+                              }
+                          })
+                  # Bold text in paragraph
+                  elif line.strip() and not line.strip().startswith('<'):
+                      text = line.strip()[:1900]
+                      # Convert **bold** to Notion bold
+                      rich_text = []
+                      parts = re.split(r'(\\*\\*[^*]+\\*\\*)', text)
+                      for part in parts:
+                          if part.startswith('**') and part.endswith('**'):
+                              rich_text.append({
+                                  'text': {'content': part[2:-2]},
+                                  'annotations': {'bold': True}
+                              })
+                          elif part:
+                              rich_text.append({'text': {'content': part}})
+                      
+                      if rich_text:
+                          blocks.append({
+                              'object': 'block',
+                              'type': 'paragraph',
+                              'paragraph': {'rich_text': rich_text[:10]}  # Limit rich text items
+                          })
+                  
+                  i += 1
+              
+              return blocks
           
           # Find all markdown files
           md_files = glob.glob('products/**/*.md', recursive=True)
@@ -74,26 +157,11 @@ jobs:
               # Create page title from filename
               title = Path(md_file).stem.replace('_', ' ')
               
-              # Split content into chunks (Notion API limit)
-              max_length = 1900  # 安全のため少し小さく
-              content_chunks = [content[i:i+max_length] for i in range(0, len(content), max_length)]
-              
               try:
-                  # Create a new page in Notion
-                  children = []
-                  for chunk in content_chunks[:5]:  # 最初の5チャンクのみ
-                      children.append({
-                          'object': 'block',
-                          'type': 'paragraph',
-                          'paragraph': {
-                              'rich_text': [{
-                                  'text': {
-                                      'content': chunk
-                                  }
-                              }]
-                          }
-                      })
+                  # Convert markdown to Notion blocks
+                  blocks = markdown_to_notion_blocks(content)
                   
+                  # Create a new page in Notion
                   response = notion.pages.create(
                       parent={'page_id': root_page_id},
                       properties={
@@ -105,10 +173,11 @@ jobs:
                               }]
                           }
                       },
-                      children=children if children else None
+                      children=blocks[:100] if blocks else None  # Notion API limit
                   )
                   print(f'✅ Created page: {title}')
                   print(f'   Page ID: {response[\"id\"]}')
+                  print(f'   Blocks created: {len(blocks)}')
               except Exception as e:
                   print(f'❌ Failed to create page {title}: {e}')
           "
