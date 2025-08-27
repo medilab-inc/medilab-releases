@@ -49,6 +49,69 @@ jobs:
           echo "=== Markdown files to sync ==="
           find products -name "*.md" -type f
       
+      - name: Sync to Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_ROOT_PAGE_ID: ${{ secrets.NOTION_ROOT_PAGE_ID }}
+        run: |
+          python -c "
+          import os
+          import glob
+          from pathlib import Path
+          from notion_client import Client
+          
+          notion = Client(auth=os.environ['NOTION_TOKEN'])
+          root_page_id = os.environ['NOTION_ROOT_PAGE_ID']
+          
+          # Find all markdown files
+          md_files = glob.glob('products/**/*.md', recursive=True)
+          
+          for md_file in md_files:
+              with open(md_file, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              
+              # Create page title from filename
+              title = Path(md_file).stem.replace('_', ' ')
+              
+              # Split content into chunks (Notion API limit)
+              max_length = 2000
+              content_chunks = [content[i:i+max_length] for i in range(0, len(content), max_length)]
+              
+              try:
+                  # Create a new page in Notion
+                  children = []
+                  for chunk in content_chunks[:5]:  # 最初の5チャンクのみ
+                      children.append({
+                          'object': 'block',
+                          'type': 'paragraph',
+                          'paragraph': {
+                              'rich_text': [{
+                                  'text': {
+                                      'content': chunk
+                                  }
+                              }]
+                          }
+                      })
+                  
+                  response = notion.pages.create(
+                      parent={'page_id': root_page_id},
+                      properties={
+                          'title': {
+                              'title': [{
+                                  'text': {
+                                      'content': title
+                                  }
+                              }]
+                          }
+                      },
+                      children=children if children else None
+                  )
+                  print(f'✅ Created page: {title}')
+                  print(f'   Page ID: {response[\"id\"]}')
+              except Exception as e:
+                  print(f'❌ Failed to create page {title}: {e}')
+          "
+      
       - name: Notify Slack Success
         if: success() && github.event_name == 'push'
         env:
@@ -57,5 +120,5 @@ jobs:
           if [ -n "$SLACK_WEBHOOK" ]; then
             curl -X POST $SLACK_WEBHOOK \
               -H 'Content-Type: application/json' \
-              -d '{"text":"✅ Notion同期の準備が完了しました"}'
+              -d '{"text":"✅ リリースノートがNotionに同期されました\n更新内容: '"${{ github.event.head_commit.message }}"'"}'
           fi
