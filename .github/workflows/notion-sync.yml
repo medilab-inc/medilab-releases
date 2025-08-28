@@ -247,8 +247,9 @@ jobs:
                   # Convert first part of content (optimized for important sections)
                   lines = content.split('\\n')
                   
-                  # Focus on the first 200 lines which usually contain the most important info
-                  important_content = '\\n'.join(lines[:200])
+                  # Process up to 500 lines to include more content
+                  # (Notion API has limits, so we can't process unlimited content)
+                  important_content = '\\n'.join(lines[:500])
                   blocks = markdown_to_notion_blocks(important_content)
                   
                   # Create a new page in Notion
@@ -271,7 +272,7 @@ jobs:
                   print(f'   Blocks created: {len(blocks)} (from {len(lines)} total lines)')
                   
                   # Add a link to GitHub for full content
-                  if len(lines) > 200:
+                  if len(lines) > 500:
                       print(f'   Note: Full content ({len(lines)} lines) available in GitHub')
               except Exception as e:
                   print(f'❌ Failed to create page {title}: {e}')
