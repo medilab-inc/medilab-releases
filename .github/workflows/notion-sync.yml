@@ -372,7 +372,9 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
           if [ -n "$SLACK_WEBHOOK" ]; then
+            # Get the first line of commit message as title
+            COMMIT_TITLE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
             curl -X POST $SLACK_WEBHOOK \
               -H 'Content-Type: application/json' \
-              -d '{"text":"✅ リリースノートがNotionに同期されました\n更新内容: '"${{ github.event.head_commit.message }}"'\n\n📄 Notionページ: https://www.notion.so/25c76a51b0c7802285d9f5d332f88688"}'
+              -d '{"text":"📄 *リリースノート更新*\n\n'"${COMMIT_TITLE}"'\n→ <https://www.notion.so/25c76a51b0c7802285d9f5d332f88688|Notionで確認>\n→ 更新内容: '"${{ github.event.head_commit.message }}"'"}'
           fi
