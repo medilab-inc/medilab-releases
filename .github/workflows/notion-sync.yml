@@ -92,9 +92,29 @@ jobs:
               in_details = False
               details_content = []
               details_summary = ''
+              skip_toc = False
+              
+              # Add Notion native Table of Contents block at the beginning
+              blocks.append({
+                  'object': 'block',
+                  'type': 'table_of_contents',
+                  'table_of_contents': {}
+              })
               
               while i < len(lines) and len(blocks) < 100:  # Notion API limit is 100 blocks
                   line = lines[i]
+                  
+                  # Skip markdown TOC section
+                  if '## 📑 目次' in line or '## 目次' in line:
+                      skip_toc = True
+                      i += 1
+                      continue
+                  elif skip_toc and line.startswith('##'):
+                      skip_toc = False
+                      # Don't increment i, process this header
+                  elif skip_toc:
+                      i += 1
+                      continue
                   
                   # Handle <details> tags
                   if '<details>' in line:
