@@ -36,7 +36,7 @@ medilab-releases/
 
 ```bash
 # 例：Kakeruの2025年Q3リリースノート作成
-cp templates/release-note-template.md products/kakeru/releases/2025/Q3/v2.5.0_2025-08-27.md
+cp templates/release-note-template.md products/kakeru/releases/2025/Q3/kakeru_2025-08-27.md
 ```
 
 ### 2. 記載原則
@@ -81,20 +81,19 @@ cp templates/release-note-template.md products/kakeru/releases/2025/Q3/v2.5.0_20
 
 ### ファイル名
 ```
-v{major}.{minor}.{patch}_{YYYY-MM-DD}.md
+{product}_{YYYY-MM-DD}.md
 ```
 
 例：
-- `v2.5.0_2025-08-27.md` - メジャーリリース
-- `v2.4.1_2025-08-15.md` - パッチリリース
-- `v2.4.0-hotfix1_2025-08-16.md` - ホットフィックス
+- `kakeru_2025-08-27.md` - リリースノート
+- `kakeru_2025-08-15.md` - パッチリリース
+- `kakeru_2025-08-16-hotfix.md` - ホットフィックス
 
 ## ✏️ 記述ルール
 
 ### 必須項目
 
 1. **リリース情報**
-   - バージョン番号
    - リリース日
    - 更新の概要（1-2文でユーザーメリットを説明）
 
