@@ -175,6 +175,13 @@ jobs:
                       i += 1
                       continue
                   
+                  # Dividers
+                  elif line.strip() == '---':
+                      blocks.append({
+                          'object': 'block',
+                          'type': 'divider',
+                          'divider': {}
+                      })
                   # Headers
                   elif line.startswith('# '):
                       blocks.append({
