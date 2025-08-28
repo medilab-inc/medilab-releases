@@ -374,5 +374,5 @@ jobs:
           if [ -n "$SLACK_WEBHOOK" ]; then
             curl -X POST $SLACK_WEBHOOK \
               -H 'Content-Type: application/json' \
-              -d '{"text":"✅ リリースノートがNotionに同期されました\n更新内容: '"${{ github.event.head_commit.message }}"'"}'
+              -d '{"text":"✅ リリースノートがNotionに同期されました\n更新内容: '"${{ github.event.head_commit.message }}"'\n\n📄 Notionページ: https://www.notion.so/25c76a51b0c7802285d9f5d332f88688"}'
           fi
