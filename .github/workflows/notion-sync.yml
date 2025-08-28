@@ -374,7 +374,35 @@ jobs:
           if [ -n "$SLACK_WEBHOOK" ]; then
             # Get the first line of commit message as title
             COMMIT_TITLE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+            # Get commit message body (skip first line and emoji signature)
+            COMMIT_BODY=$(echo "${{ github.event.head_commit.message }}" | sed '1d' | sed '/🤖 Generated with/,$d' | sed '/^$/d' | head -5)
+            
             curl -X POST $SLACK_WEBHOOK \
               -H 'Content-Type: application/json' \
-              -d '{"text":"📄 *リリースノート更新*\n\n'"${COMMIT_TITLE}"'\n→ <https://www.notion.so/25c76a51b0c7802285d9f5d332f88688|Notionで確認>\n→ 更新内容: '"${{ github.event.head_commit.message }}"'"}'
+              -d '{
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "📝 '"${COMMIT_TITLE}"'",
+                      "emoji": true
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "<https://www.notion.so/25c76a51b0c7802285d9f5d332f88688|*🔗 Notionでリリースノートを確認*>"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*更新内容:*\n'"${COMMIT_BODY}"'"
+                    }
+                  }
+                ]
+              }'
           fi
